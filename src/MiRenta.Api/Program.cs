@@ -48,7 +48,9 @@ var jwt = config.GetSection(JwtOptions.Section).Get<JwtOptions>() ?? new JwtOpti
 var app0 = config.GetSection(AppOptions.Section).Get<AppOptions>() ?? new AppOptions();
 var storage = config.GetSection(StorageOptions.Section).Get<StorageOptions>() ?? new StorageOptions();
 var connection = config.GetConnectionString("MiRenta");
-StartupValidation.Validate(isProd, jwt, app0, storage, connection);
+StartupValidation.Validate(isProd, jwt, app0, storage, connection,
+    config.GetSection(EmailOptions.Section).Get<EmailOptions>() ?? new EmailOptions(),
+    config.GetSection(AiOptions.Section).Get<AiOptions>() ?? new AiOptions());
 
 builder.Services.AddDbContext<MiRentaDbContext>(o => o.UseNpgsql(connection, n => n.MigrationsHistoryTable("__ef_migrations_history", "mi_renta"))
     .UseSnakeCaseNamingConvention());

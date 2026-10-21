@@ -17,7 +17,8 @@ public static class RateLimits
 public static class StartupValidation
 {
     /// <summary>Falla al iniciar si en producción falta configuración de seguridad (nunca imprime valores).</summary>
-    public static void Validate(bool isProd, JwtOptions jwt, AppOptions app, StorageOptions storage, string? connection)
+    public static void Validate(bool isProd, JwtOptions jwt, AppOptions app, StorageOptions storage, string? connection,
+        Infrastructure.Email.EmailOptions? email = null, Infrastructure.Ai.AiOptions? ai = null)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(connection)) errors.Add("ConnectionStrings:MiRenta es obligatorio.");
@@ -29,7 +30,12 @@ public static class StartupValidation
             if (!storage.IsConfigured) errors.Add("Storage:* es obligatorio en producción (bucket privado).");
             if (app.AllowedOrigins.Length == 0 || app.AllowedOrigins.Any(o => o == "*" || !o.StartsWith("https://", StringComparison.Ordinal)))
                 errors.Add("App:AllowedOrigins debe listar orígenes https explícitos.");
+            if (string.IsNullOrWhiteSpace(email?.SmtpHost)) errors.Add("Email:SmtpHost es obligatorio en producción (verificación de correo y recuperación).");
+            if (email?.UsesPickupDirectory == true) errors.Add("Email:PickupDirectory solo se permite en desarrollo.");
+            if (!app.FrontendBaseUrl.StartsWith("https://", StringComparison.Ordinal)) errors.Add("App:FrontendBaseUrl debe ser https en producción.");
         }
+        if (ai is { Provider: "Anthropic" } && string.IsNullOrWhiteSpace(ai.ApiKey)) errors.Add("Ai:ApiKey es obligatoria si Ai:Provider=Anthropic.");
+        if (ai is not null && ai.Provider is not ("Disabled" or "Anthropic")) errors.Add("Ai:Provider debe ser Disabled o Anthropic.");
         if (errors.Count > 0) throw new InvalidOperationException("Configuración inválida: " + string.Join(" ", errors));
     }
 }

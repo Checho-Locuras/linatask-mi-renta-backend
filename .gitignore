@@ -11,3 +11,5 @@ TestResults/
 coverage/
 *.dump
 *.bak
+.local-mail/
+secrets.json

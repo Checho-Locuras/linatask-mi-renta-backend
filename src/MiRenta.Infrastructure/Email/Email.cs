@@ -15,7 +15,13 @@ public sealed class EmailOptions
     public string From { get; set; } = "Mi renta <no-reply@example.invalid>";
     /// <summary>Máximo de recordatorios por usuario cada 7 días.</summary>
     public int MaxRemindersPerWeek { get; set; } = 2;
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(SmtpHost);
+    /// <summary>
+    /// SOLO desarrollo local: si se define, los correos se escriben como archivos .eml en esta carpeta en lugar de
+    /// enviarse por SMTP (permite verificar la cuenta sin un proveedor). Producción rechaza esta opción al iniciar.
+    /// </summary>
+    public string? PickupDirectory { get; set; }
+    public bool UsesPickupDirectory => !string.IsNullOrWhiteSpace(PickupDirectory);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(SmtpHost) || UsesPickupDirectory;
 }
 
 public interface IEmailSender
@@ -31,14 +37,27 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSend
     public async Task SendAsync(string to, string subject, string textBody, CancellationToken ct)
     {
         var o = options.Value;
-        using var client = new SmtpClient(o.SmtpHost, o.SmtpPort) { EnableSsl = o.UseSsl };
-        if (!string.IsNullOrEmpty(o.Username)) client.Credentials = new NetworkCredential(o.Username, o.Password);
+        using var client = o.UsesPickupDirectory
+            ? new SmtpClient { DeliveryMethod = SmtpDeliveryMethod.SpecifiedPickupDirectory, PickupDirectoryLocation = EnsureDirectory(o.PickupDirectory!) }
+            : new SmtpClient(o.SmtpHost, o.SmtpPort) { EnableSsl = o.UseSsl };
+        if (!o.UsesPickupDirectory && !string.IsNullOrEmpty(o.Username)) client.Credentials = new NetworkCredential(o.Username, o.Password);
         using var msg = new MailMessage { From = new MailAddress(ParseAddress(o.From).Address, ParseAddress(o.From).DisplayName), Subject = subject, Body = textBody, IsBodyHtml = false };
         msg.To.Add(to);
+        msg.BodyEncoding = System.Text.Encoding.UTF8;
+        msg.SubjectEncoding = System.Text.Encoding.UTF8;
+        // En la carpeta local el cuerpo queda legible (8 bits) para copiar el enlace de verificación.
+        if (o.UsesPickupDirectory) msg.BodyTransferEncoding = System.Net.Mime.TransferEncoding.EightBit;
         await client.SendMailAsync(msg, ct);
     }
 
     private static MailAddress ParseAddress(string s) => new(s);
+
+    private static string EnsureDirectory(string path)
+    {
+        var full = Path.GetFullPath(path);
+        Directory.CreateDirectory(full);
+        return full;
+    }
 }
 
 /// <summary>Captura en memoria (pruebas y desarrollo).</summary>

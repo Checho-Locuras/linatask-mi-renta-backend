@@ -97,7 +97,7 @@ public sealed class ReminderScheduler(MiRentaDbContext db, IOptions<EmailOptions
         var candidates = await db.Cases.Where(c => c.DeletedAt == null && c.Status != CaseStatus.Completed && c.Status != CaseStatus.ApprovedForExport
                 && c.Status != CaseStatus.Blocked && (c.LastUserActivityAt ?? c.CreatedAt) < cutoff)
             .Join(db.Users.Where(u => !u.RemindersOptOut && !u.IsDisabled && u.EmailVerifiedAt != null), c => c.OwnerUserId, u => u.Id, (c, u) => new { c, u })
-            .Take(200).ToListAsync(ct);
+            .OrderBy(x => x.c.CreatedAt).Take(200).ToListAsync(ct);
         var queued = 0;
         foreach (var x in candidates)
         {

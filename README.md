@@ -46,13 +46,17 @@ export ConnectionStrings__MiRenta="Host=localhost;Database=mi_renta;Username=<us
 export Jwt__SigningKey="$(openssl rand -base64 48)"
 export App__UrlSigningKey="$(openssl rand -base64 48)"
 export ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://localhost:5080
-dotnet run --project src/MiRenta.Api
+dotnet run --project src/MiRenta.Api   # o configura los 3 valores con dotnet user-secrets (ver docs/CONFIGURATION.md)
 ```
 
 Si no hay `Storage__*` configurado, en desarrollo usa un almacenamiento en memoria. **Producción lo rechaza al
 iniciar.** Las migraciones se aplican al arrancar (`Database__MigrateOnStartup=true`).
 
-Variables completas (sin secretos): [.env.example](.env.example).
+Variables completas (sin secretos): [.env.example](.env.example). Inventario de secretos, User Secrets y pasos:
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+En desarrollo los correos se escriben en `src/MiRenta.Api/.local-mail/` (ignorado por Git) para poder verificar la
+cuenta sin SMTP.
 
 ## Pruebas
 

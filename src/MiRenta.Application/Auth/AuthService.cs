@@ -133,7 +133,7 @@ public sealed class AuthService(MiRentaDbContext db, IOptions<JwtOptions> jwt, I
         {
             var doc = NormalizeDocument(IdentityDocumentType.CedulaCiudadania, id) ?? NormalizeDocument(IdentityDocumentType.Pasaporte, id);
             // Un mismo número con dos tipos de documento distintos es ambiguo: se rechaza igual que credenciales inválidas.
-            var matches = doc is null ? [] : await db.Users.Where(u => u.DocumentNumber == doc).Take(2).ToListAsync(ct);
+            var matches = doc is null ? [] : await db.Users.Where(u => u.DocumentNumber == doc).OrderBy(u => u.Id).Take(2).ToListAsync(ct);
             user = matches.Count == 1 ? matches[0] : null;
         }
 
