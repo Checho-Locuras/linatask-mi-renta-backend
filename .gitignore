@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+.idea/
+.env
+*.env.local
+appsettings.*.local.json
+TestResults/
+coverage/
+*.dump
+*.bak
