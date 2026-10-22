@@ -15,6 +15,12 @@ public sealed class StorageOptions
     /// <summary>Bucket PRIVADO exclusivo de Mi renta (sin dominio público ni r2.dev).</summary>
     public string BucketName { get; set; } = string.Empty;
     public long MaxFileBytes { get; set; } = 15 * 1024 * 1024;
+    /// <summary>
+    /// SOLO desarrollo local: carpeta en disco para guardar documentos sin R2 (persisten entre reinicios). Producción la
+    /// rechaza al iniciar. Si no hay R2 ni carpeta, se usa memoria (los archivos se pierden al reiniciar).
+    /// </summary>
+    public string? LocalDirectory { get; set; }
+    public bool UsesLocalDirectory => !string.IsNullOrWhiteSpace(LocalDirectory);
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ServiceUrl) && !string.IsNullOrWhiteSpace(BucketName)
         && !string.IsNullOrWhiteSpace(AccessKeyId) && !string.IsNullOrWhiteSpace(SecretAccessKey);
 }
@@ -89,6 +95,53 @@ public sealed class S3PrivateObjectStorage : IPrivateObjectStorage, IDisposable
     }
 
     public void Dispose() => _client.Dispose();
+}
+
+/// <summary>
+/// Almacenamiento en disco SOLO para desarrollo local. Las claves son opacas (generadas por el servidor); igualmente se
+/// valida que no puedan salir de la carpeta raíz.
+/// </summary>
+public sealed class LocalDiskObjectStorage : IPrivateObjectStorage
+{
+    private readonly string _root;
+
+    public LocalDiskObjectStorage(IOptions<StorageOptions> options)
+    {
+        _root = Path.GetFullPath(options.Value.LocalDirectory ?? throw new InvalidOperationException("Storage:LocalDirectory vacío."));
+        Directory.CreateDirectory(_root);
+    }
+
+    private string PathFor(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key) || key.Contains("..") || key.Contains('\\') || key.StartsWith('/') || key.Contains(':'))
+            throw new ArgumentException("Clave de almacenamiento inválida.", nameof(key));
+        var full = Path.GetFullPath(Path.Combine(_root, key));
+        if (!full.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            throw new ArgumentException("Clave de almacenamiento inválida.", nameof(key));
+        return full;
+    }
+
+    public async Task PutAsync(string key, byte[] content, string contentType, CancellationToken ct)
+    {
+        var path = PathFor(key);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllBytesAsync(path, content, ct);
+    }
+
+    public async Task<byte[]?> GetAsync(string key, CancellationToken ct)
+    {
+        var path = PathFor(key);
+        return File.Exists(path) ? await File.ReadAllBytesAsync(path, ct) : null;
+    }
+
+    public Task DeleteAsync(string key, CancellationToken ct)
+    {
+        var path = PathFor(key);
+        if (File.Exists(path)) File.Delete(path);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> PingAsync(CancellationToken ct) => Task.FromResult(Directory.Exists(_root));
 }
 
 /// <summary>Almacenamiento en memoria SOLO para desarrollo sin S3 configurado (se rechaza en producción).</summary>

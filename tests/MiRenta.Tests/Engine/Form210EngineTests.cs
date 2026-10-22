@@ -150,7 +150,10 @@ public class Form210EngineTests
         Assert.Equal(CalculationStatus.Blocked, r.Status);
         Assert.True(r.IsPreview);
         Assert.All(r.Blocking, b => Assert.StartsWith("accountant.required.", b.Code));
-        Assert.Contains(r.Lines.Single(l => l.Concept == "advance.next").Warnings, w => w.Contains("contador"));
+        var advance = r.Lines.Single(l => l.Concept == "advance.next").Warnings;
+        Assert.Contains(advance, w => w.Contains("vista previa con 0"));
+        // Una regla sin implementar no se presenta como "pendiente de aprobación" (no hay nada que aprobar).
+        Assert.DoesNotContain(advance, w => w.Contains("pendiente de aprobación"));
 
         // Si el valor lo ingresa el propio contribuyente (no un contador), sigue bloqueado.
         var self = Base.ToDictionary();

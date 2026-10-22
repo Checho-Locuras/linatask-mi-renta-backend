@@ -1,7 +1,6 @@
 # Mi renta API — imagen independiente (no comparte nada con el monolito de LinaTask).
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY MiRenta.slnx ./
 COPY src/MiRenta.Domain/MiRenta.Domain.csproj src/MiRenta.Domain/
 COPY src/MiRenta.Infrastructure/MiRenta.Infrastructure.csproj src/MiRenta.Infrastructure/
 COPY src/MiRenta.Application/MiRenta.Application.csproj src/MiRenta.Application/

@@ -109,9 +109,9 @@ public sealed class ReminderScheduler(MiRentaDbContext db, IOptions<EmailOptions
                 : open.Contains(TaskKind.DocumentRequest)
                     ? (EmailKinds.PendingDocuments, "Puedes subir tus documentos en Mi renta", "Aún puedes subir documentos que te ayudan a preparar tu borrador.")
                     : (EmailKinds.IncompleteReturn, "Tu borrador en Mi renta sigue en proceso", "Tu borrador de declaración aún no está terminado.");
-            var body = line + "\n\nIngresa a Mi renta para continuar: " + app.Value.FrontendBaseUrl + "/mi-renta\n\n" +
+            var body = line + "\n\nIngresa a Mi renta para continuar: " + app.Value.FrontendBaseUrl + "\n\n" +
                        "Consulta los plazos oficiales en el sitio de la DIAN. Este correo no contiene información de tu declaración.\n\n" +
-                       "Para dejar de recibir recordatorios: " + app.Value.FrontendBaseUrl + "/mi-renta/recordatorios/baja?token=" + unsub.Create(x.u.Id);
+                       "Para dejar de recibir recordatorios: " + app.Value.FrontendBaseUrl + "/recordatorios/baja?token=" + unsub.Create(x.u.Id);
             if (await EmailOutbox.QueueAsync(db, x.u.Id, x.c.Id, x.u.Email, kind, subject, body, $"{kind}:{x.c.Id}:{now.Year}-W{week}", ct)) queued++;
             await db.SaveChangesAsync(ct);
         }

@@ -58,4 +58,32 @@ public class ConfigurationTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void Production_rejects_local_disk_storage()
+    {
+        var smtp = new EmailOptions { SmtpHost = "smtp.example.test" };
+        var local = new StorageOptions { ServiceUrl = S3.ServiceUrl, BucketName = "b", AccessKeyId = "id", SecretAccessKey = "s", LocalDirectory = "x" };
+        Assert.Throws<InvalidOperationException>(() => StartupValidation.Validate(true, Jwt(K1), App(K2, "https://app.example.test"), local, "Host=x", smtp));
+    }
+
+    [Fact]
+    public async Task Local_disk_storage_persists_and_blocks_path_traversal()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mirenta-store-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new LocalDiskObjectStorage(Options.Create(new StorageOptions { LocalDirectory = dir }));
+            var key = StorageKeys.ForDocument(Guid.NewGuid(), Guid.NewGuid());
+            await store.PutAsync(key, [1, 2, 3], "application/pdf", default);
+            // Una instancia nueva (como tras reiniciar la API) sigue viendo el archivo.
+            var again = new LocalDiskObjectStorage(Options.Create(new StorageOptions { LocalDirectory = dir }));
+            Assert.Equal(new byte[] { 1, 2, 3 }, await again.GetAsync(key, default));
+            await again.DeleteAsync(key, default);
+            Assert.Null(await again.GetAsync(key, default));
+            foreach (var bad in new[] { "../fuera", "/etc/passwd", "a/../../b", "c:\\x", "" })
+                await Assert.ThrowsAsync<ArgumentException>(() => again.PutAsync(bad, [1], "x", default));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
 }

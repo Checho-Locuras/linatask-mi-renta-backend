@@ -68,7 +68,7 @@ public class PlatformTests(ApiFixture f) : IClassFixture<ApiFixture>
             Assert.DoesNotMatch(@"\d{1,3}(\.\d{3}){2,}", body);       // sin cifras
             Assert.DoesNotContain("/files/", body);                    // sin enlaces a documentos
             Assert.DoesNotContain("vence", body.ToLowerInvariant());   // sin afirmar plazos
-            Assert.Contains("recordatorios/baja?token=", body);
+            Assert.Contains("http://localhost:4200/recordatorios/baja?token=", body);
 
             await f.DispatchEmailsAsync();
             Assert.Contains(f.Emails.Sent, m => m.To == s.Email && m.Subject.Contains("pendientes"));

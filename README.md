@@ -1,85 +1,86 @@
-# Mi renta — microservicio de declaración de renta (formulario 210, AG 2025)
+# Mi renta — backend (.NET 10)
 
-Mi renta es un servicio **independiente** del monolito de LinaTask. Ayuda a una persona natural residente con rentas
-de trabajo laborales a preparar un **borrador** del formulario 210 del año gravable 2025. Tiene:
+Mi renta es una API independiente para preparar el **borrador** de la declaración de renta de personas naturales,
+formulario 210 del año gravable 2025, para residentes con rentas de trabajo.
 
-- su propia identidad,
-- su propia base de datos,
-- su propio bucket privado,
-- sus propios trabajadores de fondo,
-- su propio despliegue.
+No depende de LinaTask: tiene su propia identidad, base de datos, migraciones, claves, almacenamiento y trabajadores
+de fondo. La consume el frontend independiente
+[`linatask-mi-renta-frontend`](https://github.com/Checho-Locuras/linatask-mi-renta-frontend).
 
-El frontend de LinaTask (`linatask-admin-web`, ruta `/mi-renta`) lo consume directamente. No hay proxy en el monolito.
+> **Estado: listo para pruebas locales controladas, no para usuarios finales.**
+> - Las reglas tributarias citan su norma, pero siguen **pendientes de aprobación profesional**.
+> - El mapeo de casillas del formulario 210 no está verificado.
+> - Mi renta no presenta declaraciones ni pide la contraseña de la DIAN.
+> - IA y DIAN están desactivadas.
 
-> Mi renta **no presenta** la declaración, **no pide ni guarda la contraseña de la DIAN** y **no inventa reglas**:
-> - Cada regla cita su norma.
-> - Las reglas están *pendientes de aprobación profesional*.
-> - Lo que no tiene fuente verificable bloquea el cálculo.
->
-> Un contador autorizado debe revisar y aprobar el borrador antes de exportarlo.
-
-## Estructura
+## Solución y proyectos
 
 ```
-src/MiRenta.Domain          Entidades, máquina de estados, catálogo de reglas AG2025 y motor 210 (función pura, decimal)
-src/MiRenta.Infrastructure  EF Core (esquema mi_renta), migraciones, S3/R2 privado, extracción (pdftotext/OpenXml/CSV),
-                            cola de trabajos (SKIP LOCKED), correo SMTP, adaptadores DIAN e IA (ambos desactivados)
-src/MiRenta.Application     Autenticación, expedientes, asistente, documentos, conciliación, cálculo, borrador, contador,
-                            recordatorios
-src/MiRenta.Api             Minimal APIs /api/v1/my-rent, JWT propio, CORS restrictivo, rate limiting, ProblemDetails, health
-tests/MiRenta.Tests         Unitarias (motor, archivos, criptografía, IA, DIAN) + integración (TestServer + PostgreSQL + S3)
-tools/MiRenta.MigrationScaffolder  Genera migraciones sin la herramienta global dotnet-ef
+MiRenta.sln
+├─ src/MiRenta.Domain            Entidades, máquina de estados, catálogo de reglas AG2025, motor 210 (función pura, decimal)
+├─ src/MiRenta.Infrastructure    EF Core (esquema mi_renta) y migraciones; R2/S3, disco local o memoria; extracción
+│                                (pdftotext/OpenXml/CSV); cola SKIP LOCKED; SMTP/.eml; adaptadores DIAN e IA (desactivados)
+├─ src/MiRenta.Application       Autenticación, expedientes, asistente, documentos, conciliación, cálculo, borrador,
+│                                contador, recordatorios
+├─ src/MiRenta.Api               Minimal APIs /api/v1/my-rent, JWT propio, CORS restrictivo, rate limiting, health checks
+├─ tests/MiRenta.Tests           Unitarias + integración (TestServer + PostgreSQL + S3 local)
+└─ tools/MiRenta.MigrationScaffolder   Genera migraciones sin la herramienta global dotnet-ef
 ```
 
-Más detalle en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Para abrirla:
+- **Visual Studio 2022:** abre `MiRenta.sln` y elige el perfil `http` del proyecto `MiRenta.Api`.
+- **VS Code:** con la extensión C# Dev Kit, `code .` en la raíz; el explorador de soluciones carga `MiRenta.sln`.
 
 ## Ejecutar en local
 
-Requisitos:
-- .NET 10 SDK,
-- PostgreSQL 14+,
-- `pdftotext` (paquete `poppler-utils`),
-- opcional: un S3 local (p. ej. `s3rver`) o un bucket R2 de desarrollo.
+1. Prepara PostgreSQL y los **3 secretos mínimos** con User Secrets: [docs/CONFIGURATION.md](docs/CONFIGURATION.md),
+   secciones 3 y 4.
+2. Compila y arranca:
 
-```bash
-export ConnectionStrings__MiRenta="Host=localhost;Database=mi_renta;Username=<usuario>;Password=<contraseña>"
-export Jwt__SigningKey="$(openssl rand -base64 48)"
-export App__UrlSigningKey="$(openssl rand -base64 48)"
-export ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://localhost:5080
-dotnet run --project src/MiRenta.Api   # o configura los 3 valores con dotnet user-secrets (ver docs/CONFIGURATION.md)
+```powershell
+dotnet restore
+dotnet build
+dotnet run --project src\MiRenta.Api --launch-profile http   # http://localhost:5080
+Invoke-RestMethod http://localhost:5080/health/ready
 ```
 
-Si no hay `Storage__*` configurado, en desarrollo usa un almacenamiento en memoria. **Producción lo rechaza al
-iniciar.** Las migraciones se aplican al arrancar (`Database__MigrateOnStartup=true`).
+En desarrollo no necesitas R2 ni SMTP:
+- los documentos se guardan en `src/MiRenta.Api/.local-storage/`;
+- los correos, con el enlace de verificación, en `src/MiRenta.Api/.local-mail/`.
 
-Variables completas (sin secretos): [.env.example](.env.example). Inventario de secretos, User Secrets y pasos:
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
-En desarrollo los correos se escriben en `src/MiRenta.Api/.local-mail/` (ignorado por Git) para poder verificar la
-cuenta sin SMTP.
+Ambas carpetas están ignoradas por Git y prohibidas en producción.
 
 ## Pruebas
 
-```bash
-export MIRENTA_TEST_POSTGRES="Host=localhost;Port=5432;Username=<rol-con-CREATEDB>;Password=<contraseña>"
-export MIRENTA_TEST_S3_ENDPOINT=http://localhost:4569   # s3rver -p 4569 --configure-bucket mi-renta-test
+```powershell
+$env:MIRENTA_TEST_POSTGRES = "Host=localhost;Port=5432;Username=<rol-con-CREATEDB>;Password=<contraseña>"
+npx s3rver -d .s3 -p 4569 --configure-bucket mi-renta-test   # en otra terminal
 dotnet test
 ```
 
-- Cada clase de integración crea y elimina su propia base de datos.
-- Todos los archivos de prueba son sintéticos.
+## Documentación
+
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md): inventario de secretos, User Secrets, PostgreSQL y limitaciones locales.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): arquitectura, seguridad, motor tributario, endpoints y limitaciones.
+- [.env.example](.env.example): variables para contenedores, sin valores reales.
 
 ## Nueva migración
 
-```bash
-dotnet build tools/MiRenta.MigrationScaffolder
-dotnet tools/MiRenta.MigrationScaffolder/bin/Debug/net10.0/MiRenta.MigrationScaffolder.dll <Nombre>
+```powershell
+dotnet build tools\MiRenta.MigrationScaffolder
+dotnet tools\MiRenta.MigrationScaffolder\bin\Debug\net10.0\MiRenta.MigrationScaffolder.dll <Nombre>
 ```
 
-## Despliegue
+Si tienes `dotnet-ef` instalado, también funciona:
 
-- `Dockerfile`: runtime ASP.NET 10 con `poppler-utils`, usuario no root, puerto 8080.
+```powershell
+dotnet ef migrations add <Nombre> --project src\MiRenta.Infrastructure --startup-project src\MiRenta.Api
+```
+
+## Despliegue (fase posterior; no realizado)
+
+- `Dockerfile`: ASP.NET 10 con `poppler-utils`, usuario no root, puerto 8080.
 - `railway.json`: healthcheck en `/health/ready`.
 
-Requiere su propio servicio, su propia base PostgreSQL y un bucket R2 privado exclusivo. Configura
-`App__AllowedOrigins__0` con el origen https del frontend.
+Requiere su propio servicio, base PostgreSQL, bucket R2 privado y SMTP. Ver la tabla de producción en
+`docs/CONFIGURATION.md`.

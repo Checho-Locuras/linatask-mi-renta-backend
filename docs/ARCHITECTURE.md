@@ -4,18 +4,19 @@
 
 | Aspecto | Mi renta | Monolito LinaTask |
 |---|---|---|
-| Repositorio | `linatask-mi-renta` | `linatask-backend` (sin cambios) |
+| Repositorios | `linatask-mi-renta-backend` y `linatask-mi-renta-frontend` | `linatask-backend` y `linatask-admin-web` (sin cambios) |
+| Frontend | Angular 19 propio (rutas `/`, `/expediente/:id`, `/verificar-correo`, `/restablecer`, `/recordatorios/baja`, `/consulta-dian`) | el suyo |
 | Base de datos | PostgreSQL propia, esquema `mi_renta`, historial `mi_renta.__ef_migrations_history` | la suya |
 | Identidad | cuentas, JWT (HS256, clave propia), refresh tokens rotativos | la suya |
-| Archivos | bucket privado exclusivo, clave opaca `mi-renta/cases/{caso}/documents/{doc}` | sus buckets |
+| Archivos | bucket privado exclusivo, clave opaca `mi-renta/cases/{caso}/documents/{doc}` (en desarrollo: disco local) | sus buckets |
 | Trabajadores | cola persistente en su BD (`FOR UPDATE SKIP LOCKED`), outbox de correo, recordatorios | los suyos |
-| Integración | el frontend llama directo a `/api/v1/my-rent` con CORS restrictivo | sin proxy |
+| Integración | el frontend llama directo a `/api/v1/my-rent` con CORS restrictivo | sin proxy ni endpoints nuevos |
 
 - No hay federación de identidad.
-- Si el usuario tiene sesión en LinaTask, el frontend solo precarga su correo para vincular la cuenta. La contraseña
-  de Mi renta es propia.
-- El interceptor del frontend envía el token de Mi renta únicamente al microservicio. Se registra después del de
-  LinaTask, que elimina cualquier `Authorization` hacia orígenes ajenos. El token de LinaTask nunca sale hacia Mi renta.
+- Un enlace externo puede traer `?email=` para precargar el correo en el formulario. Es opcional y no depende de
+  ninguna sesión ni API de LinaTask.
+- La sesión vive en `sessionStorage` (por pestaña), con access token de 15 minutos y refresh token rotativo de 14 días.
+  El interceptor solo adjunta el token a peticiones dirigidas a la API de Mi renta (mismo origen y prefijo).
 
 ## 2. Modelo de datos
 
@@ -324,3 +325,9 @@ Comportamiento:
 - La pre-consulta DIAN depende de endpoints no documentados y está desactivada.
 - No hay envío real de correos sin SMTP configurado: los correos quedan `Skipped`.
 - No hay despliegue todavía. Requiere su propio servicio, BD y bucket.
+- La sesión del frontend vive en `sessionStorage`. Una vulnerabilidad XSS podría leerla. Mitigaciones actuales: Angular
+  escapa por defecto, la vida del access token es corta y el refresh token rota. Antes de producción conviene una CSP
+  estricta en el host del frontend.
+- En desarrollo, `.local-storage` guarda los documentos sin cifrar en disco: usa solo documentos sintéticos.
+- Eliminar un documento borra el objeto y actualiza los hechos en pasos separados, no en una única transacción. Si
+  falla a mitad, el documento queda marcado como borrado y se puede reintentar.

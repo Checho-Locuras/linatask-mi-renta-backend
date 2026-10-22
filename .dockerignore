@@ -5,3 +5,6 @@ tools/
 .git
 .env
 *.md
+**/.local-mail
+**/.local-storage
+.s3

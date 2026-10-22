@@ -85,4 +85,35 @@ public static class FactCodes
     /// <summary>Respuestas sí/no.</summary>
     public static readonly HashSet<string> YesNo =
         [FiscalResident, IvaResponsible, HasPensionIncome, HasCapitalIncome, HasNonLaborIncome, HasDividends, HasOccasionalGains];
+
+    /// <summary>Nombre legible de cada dato (para mensajes al usuario).</summary>
+    public static string Label(string code) => code switch
+    {
+        FiscalResident => "residencia fiscal",
+        IvaResponsible => "responsabilidad de IVA",
+        IncomeSources => "tipos de ingresos",
+        LaborGrossIncome => "ingresos brutos laborales",
+        LaborMandatoryPension => "aportes obligatorios a pensión",
+        LaborMandatoryHealth => "aportes obligatorios a salud",
+        LaborWithholding => "retención en la fuente laboral",
+        FeesGrossIncome => "honorarios",
+        FeesWithholding => "retención sobre honorarios",
+        DependentsCount => "número de dependientes",
+        HousingLoanInterest => "intereses de vivienda",
+        PrepaidHealth => "medicina prepagada",
+        GrossAssets => "patrimonio bruto",
+        Debts => "deudas",
+        CreditCardSpending => "consumos con tarjeta de crédito",
+        TotalPurchases => "compras y consumos",
+        TotalDeposits => "consignaciones y depósitos",
+        HasPensionIncome => "ingresos por pensión",
+        HasCapitalIncome => "rentas de capital",
+        HasNonLaborIncome => "rentas no laborales",
+        HasDividends => "dividendos",
+        HasOccasionalGains => "ganancias ocasionales",
+        AdvancePaymentNextYear => "anticipo de renta del año siguiente",
+        PreviousYearAdvance => "anticipo liquidado en la declaración anterior",
+        AccountantDependentsAdditional => "deducción adicional por dependientes (art. 336)",
+        _ => code,
+    };
 }

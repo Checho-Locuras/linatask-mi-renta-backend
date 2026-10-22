@@ -43,6 +43,11 @@ builder.Services.Configure<StorageOptions>(config.GetSection(StorageOptions.Sect
 builder.Services.Configure<EmailOptions>(config.GetSection(EmailOptions.Section));
 builder.Services.Configure<DianOptions>(config.GetSection(DianOptions.Section));
 builder.Services.Configure<AiOptions>(config.GetSection(AiOptions.Section));
+// Carpetas locales de desarrollo: rutas relativas se resuelven contra la raíz del proyecto de API (igual en
+// dotnet run, Visual Studio o VS Code), nunca contra el directorio desde donde se lanzó el proceso.
+var contentRoot = builder.Environment.ContentRootPath;
+builder.Services.PostConfigure<StorageOptions>(o => { if (o.UsesLocalDirectory && !Path.IsPathRooted(o.LocalDirectory)) o.LocalDirectory = Path.Combine(contentRoot, o.LocalDirectory!); });
+builder.Services.PostConfigure<EmailOptions>(o => { if (o.UsesPickupDirectory && !Path.IsPathRooted(o.PickupDirectory)) o.PickupDirectory = Path.Combine(contentRoot, o.PickupDirectory!); });
 
 var jwt = config.GetSection(JwtOptions.Section).Get<JwtOptions>() ?? new JwtOptions();
 var app0 = config.GetSection(AppOptions.Section).Get<AppOptions>() ?? new AppOptions();
@@ -58,6 +63,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(new DownloadTokenSigner(Encoding.UTF8.GetBytes(app0.UrlSigningKey + ":download")));
 builder.Services.AddSingleton(new UnsubscribeSigner(Encoding.UTF8.GetBytes(app0.UrlSigningKey + ":unsubscribe")));
 if (storage.IsConfigured) builder.Services.AddSingleton<IPrivateObjectStorage, S3PrivateObjectStorage>();
+else if (storage.UsesLocalDirectory) builder.Services.AddSingleton<IPrivateObjectStorage, LocalDiskObjectStorage>();
 else builder.Services.AddSingleton<IPrivateObjectStorage, InMemoryObjectStorage>();
 builder.Services.AddSingleton<IDocumentExtractor, DeterministicDocumentExtractor>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();

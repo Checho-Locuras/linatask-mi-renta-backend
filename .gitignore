@@ -13,3 +13,5 @@ coverage/
 *.bak
 .local-mail/
 secrets.json
+.local-storage/
+.s3/

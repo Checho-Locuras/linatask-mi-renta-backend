@@ -28,6 +28,9 @@ public class AuthTests(ApiFixture f) : IClassFixture<ApiFixture>
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode); // correo sin verificar
 
         var token = await f.LastTokenAsync(email, "verify-email");
+        // El enlace apunta a la ruta del frontend independiente de Mi renta.
+        var body = await f.WithDb(db => db.Emails.Where(e => e.ToAddress == email && e.Kind == "verify-email").Select(e => e.Body).FirstAsync());
+        Assert.Contains("http://localhost:4200/verificar-correo?token=" + token, body);
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsJsonAsync("auth/verify-email", new { token })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("auth/verify-email", new { token })).StatusCode); // un solo uso
 
@@ -100,6 +103,8 @@ public class AuthTests(ApiFixture f) : IClassFixture<ApiFixture>
         Assert.Equal(await Message(known), await Message(unknown));
 
         var token = await f.LastTokenAsync(s.Email, "password-reset");
+        Assert.Contains("http://localhost:4200/restablecer?token=" + token,
+            await f.WithDb(db => db.Emails.Where(e => e.ToAddress == s.Email && e.Kind == "password-reset").Select(e => e.Body).FirstAsync()));
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("auth/reset-password", new { token, newPassword = "corta" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await c.PostAsJsonAsync("auth/reset-password", new { token, newPassword = "NuevaClave-2025z" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsJsonAsync("auth/reset-password", new { token, newPassword = "OtraClave-2025z" })).StatusCode);

@@ -28,6 +28,7 @@ public static class StartupValidation
         if (isProd)
         {
             if (!storage.IsConfigured) errors.Add("Storage:* es obligatorio en producción (bucket privado).");
+            if (storage.UsesLocalDirectory) errors.Add("Storage:LocalDirectory solo se permite en desarrollo.");
             if (app.AllowedOrigins.Length == 0 || app.AllowedOrigins.Any(o => o == "*" || !o.StartsWith("https://", StringComparison.Ordinal)))
                 errors.Add("App:AllowedOrigins debe listar orígenes https explícitos.");
             if (string.IsNullOrWhiteSpace(email?.SmtpHost)) errors.Add("Email:SmtpHost es obligatorio en producción (verificación de correo y recuperación).");

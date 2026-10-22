@@ -65,7 +65,7 @@ public static class Form210Engine
             ctx.BlockRule(C.NonResident, "scope.non_resident", "Los no residentes fiscales están fuera del alcance de este asistente.");
         foreach (var code in new[] { FactCodes.HasPensionIncome, FactCodes.HasCapitalIncome, FactCodes.HasNonLaborIncome, FactCodes.HasDividends, FactCodes.HasOccasionalGains })
             if (ctx.Text(code) == "yes")
-                ctx.Block("scope." + code, $"El expediente tiene un concepto que el MVP no calcula ({code}); requiere un profesional.");
+                ctx.Block("scope." + code, $"Declaraste {FactCodes.Label(code)}: el asistente no calcula ese concepto y el caso requiere un profesional ({code}).");
         if ((ctx.Amount(FactCodes.FeesGrossIncome) ?? 0) > 0)
             ctx.BlockRule(C.FeesIncome, "scope.fees", "Los honorarios (rentas no laborales) no están implementados.");
 
@@ -77,7 +77,7 @@ public static class Form210Engine
         if (dependents > 0) ctx.RequireAccountant(FactCodes.AccountantDependentsAdditional, C.DeductionDependentsAdditional);
 
         foreach (var f in ctx.Accepted.Values)
-            if (f.Amount < 0) ctx.Block("fact.negative", $"El valor de {f.Code} no puede ser negativo.");
+            if (f.Amount < 0) ctx.Block("fact.negative", $"El valor de {FactCodes.Label(f.Code)} no puede ser negativo.");
 
         var obligation = Obligation(ctx, uvt);
         // Si lo único que falta son valores que debe ingresar un contador, se calcula una VISTA PREVIA (estado
@@ -276,15 +276,15 @@ public static class Form210Engine
         {
             if (Accepted.ContainsKey(code)) return;
             Block("fact.missing." + code, _proposed.Contains(code)
-                ? $"El dato {code} está propuesto pero no confirmado."
-                : $"Falta el dato {code}.");
+                ? $"El dato «{FactCodes.Label(code)}» está propuesto pero no confirmado."
+                : $"Falta el dato «{FactCodes.Label(code)}».");
         }
 
         /// <summary>Concepto de regla no implementada: solo se desbloquea si un contador ingresa el valor.</summary>
         public void RequireAccountant(string factCode, string ruleCode)
         {
             if (Accepted.TryGetValue(factCode, out var f) && f.Source == FactSource.Accountant) { _rulesUsed.Add(ruleCode); return; }
-            Block("accountant.required." + factCode, $"{ruleCode} no está implementado: un contador autorizado debe ingresar {factCode}.");
+            Block("accountant.required." + factCode, $"Falta {FactCodes.Label(factCode)}: el asistente no lo calcula y debe ingresarlo un contador autorizado ({ruleCode}).");
         }
 
         public void BlockRule(string ruleCode, string code, string message) { _rulesUsed.Add(ruleCode); Block(code, message); }
@@ -299,8 +299,10 @@ public static class Form210Engine
         {
             var ids = factCodes.Where(Accepted.ContainsKey).Select(c => Accepted[c].Id).ToList();
             var warnings = new List<string>();
-            if (_rules.TryGetValue(ruleCode, out var r) && r.Status != RuleStatus.Approved)
+            if (_rules.TryGetValue(ruleCode, out var r) && r.Status == RuleStatus.PendingProfessionalApproval)
                 warnings.Add("Regla pendiente de aprobación profesional.");
+            else if (r?.Status == RuleStatus.NotImplemented)
+                warnings.Add("Concepto no calculado por el asistente: valor ingresado por un contador.");
             if (r?.Status == RuleStatus.NotImplemented && !factCodes.All(Accepted.ContainsKey))
                 warnings.Add("Valor pendiente: lo debe ingresar un contador (vista previa con 0).");
             Lines.Add(new EngineLine(concept, label, value, ruleCode, formula, ids, warnings, Lines.Count + 1));

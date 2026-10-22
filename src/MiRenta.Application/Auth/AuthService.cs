@@ -196,7 +196,7 @@ public sealed class AuthService(MiRentaDbContext db, IOptions<JwtOptions> jwt, I
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, Now), ct);
                 var token = NewEmailToken(user.Id, EmailTokenPurpose.ResetPassword, ResetTtl);
                 await EmailOutbox.QueueAsync(db, user.Id, null, user.Email, EmailKinds.PasswordReset, "Restablece tu contraseña de Mi renta",
-                    $"Para crear una contraseña nueva abre este enlace (válido 30 minutos, un solo uso):\n{app.Value.FrontendBaseUrl}/mi-renta/restablecer?token={token}\n\n" +
+                    $"Para crear una contraseña nueva abre este enlace (válido 30 minutos, un solo uso):\n{app.Value.FrontendBaseUrl}/restablecer?token={token}\n\n" +
                     "Si no lo solicitaste, ignora este correo. Nunca te pediremos tu contraseña de la DIAN.",
                     $"reset:{user.Id}:{Guid.NewGuid():N}", ct);
                 audit.Record("auth.reset_requested", user.Id, null);
@@ -247,7 +247,7 @@ public sealed class AuthService(MiRentaDbContext db, IOptions<JwtOptions> jwt, I
         if (recent >= 3) return;
         var token = NewEmailToken(user.Id, EmailTokenPurpose.VerifyEmail, VerifyTtl);
         await EmailOutbox.QueueAsync(db, user.Id, null, user.Email, EmailKinds.VerifyEmail, "Verifica tu correo en Mi renta",
-            $"Para activar tu cuenta abre este enlace (válido 24 horas, un solo uso):\n{app.Value.FrontendBaseUrl}/mi-renta/verificar-correo?token={token}\n\n" +
+            $"Para activar tu cuenta abre este enlace (válido 24 horas, un solo uso):\n{app.Value.FrontendBaseUrl}/verificar-correo?token={token}\n\n" +
             "Si no creaste esta cuenta, ignora este correo.", $"verify:{user.Id}:{Guid.NewGuid():N}", ct);
     }
 
